@@ -1629,6 +1629,20 @@ const iso3to2 = {
   XKX:"XK"
 };
 
+function codeToFlag(code) {
+  if (!code) return '';
+
+  code = code.trim().toUpperCase();
+
+  if (!/^[A-Z]{2}$/.test(code)) {
+    return '';
+  }
+
+  return String.fromCodePoint(
+    ...[...code].map(c => 127397 + c.charCodeAt())
+  );
+}	
+
 // ---- 2-LETTER CODE -> EMOJI FLAG ----
 function buildTeamDisplay(name, codeField) {
   const codes = (codeField || '')
