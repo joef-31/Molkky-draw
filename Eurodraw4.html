@@ -952,6 +952,20 @@ toggleNumbering.addEventListener('change', () => {
   renderSidebar();
 });
 
+function codeToFlag(code) {
+  if (!code) return '';
+
+  code = code.trim().toUpperCase();
+
+  if (!/^[A-Z]{2}$/.test(code)) {
+    return '';
+  }
+
+  return String.fromCodePoint(
+    ...[...code].map(c => 127397 + c.charCodeAt())
+  );
+}	
+
 // ---- THEME / LOGO APPLY ----
 function applyTheme() {
   theme.bgMain      = cfgBgColor.value       || theme.bgMain;
@@ -1628,20 +1642,6 @@ const iso3to2 = {
   // Kosovo (not official ISO but widely used)
   XKX:"XK"
 };
-
-function codeToFlag(code) {
-  if (!code) return '';
-
-  code = code.trim().toUpperCase();
-
-  if (!/^[A-Z]{2}$/.test(code)) {
-    return '';
-  }
-
-  return String.fromCodePoint(
-    ...[...code].map(c => 127397 + c.charCodeAt())
-  );
-}	
 
 // ---- 2-LETTER CODE -> EMOJI FLAG ----
 function buildTeamDisplay(name, codeField) {
