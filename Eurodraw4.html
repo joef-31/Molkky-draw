@@ -1245,7 +1245,7 @@ function placeTeam(t) {
 
   const card = document.createElement('div');
   card.className = 'player-card';
-  const flagHtml = t.flag ? `<div class="flag-box">${t.flag}</div>` : '';
+  const flagHtml = t.flag ? `<div class="flag-img">${t.flag}</div>` : '';
   card.innerHTML = `${flagHtml}<span>${t.name}</span>`;
   slot.appendChild(card);
 
@@ -1420,7 +1420,7 @@ function renderFinalPage(direction='none') {
       if (!teamName) {
         row.textContent = '—';
       } else {
-        const flagHtml = flag ? `<div class="flag-box">${flag}</div>` : '';
+        const flagHtml = flag ? `<div class="flag-img">${flag}</div>` : '';
         row.innerHTML = `${flagHtml}<span>${teamName}</span>`;
       }
       box.appendChild(row);
@@ -1478,7 +1478,7 @@ function renderPotOverviewPage(direction = 'none') {
       row.className = 'final-team';
       row.innerHTML = `
         <span class="pot-number">${i + 1}</span>
-        ${t.flag ? `<div class="flag-box">${t.flag}</div>` : ''}
+        ${t.flag ? `<div class="flag-img">${t.flag}</div>` : ''}
         <span>${t.name}</span>
       `;
       box.appendChild(row);
