@@ -1,0 +1,2189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Draw Overlay</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
+
+<style>
+:root {
+  --bg-main: #005c3a;          /* background / holding / lower third */
+  --bg-group: #0b6040;         /* group box background */
+  --bg-picked: #1f7f54;        /* team picked */
+  --bg-unpicked: #2b8b5f;      /* unpicked slot / unpicked team */
+
+  --text-slot: #ffffff;        /* team/slot text (sidebar + slots + final teams) */
+  --text-group-header: #ffffff;/* "Group A" headers */
+  --text-sidebar-title: #e0ffe9;/* "Pot 1" title */
+  --text-color: #ffffff;       /* generic UI text (config etc) */
+}
+
+body {
+  margin: 0;
+  font-family: 'Bahnschrift', sans-serif;
+  background: transparent;
+  overflow: hidden;
+}
+
+/* Top-left menu button */
+#menu-button {
+  position: fixed;
+  top: 6px;
+  left: 6px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-size: 16px;
+  cursor: pointer;
+  z-index: 30;
+}
+
+/* Dropdown under menu button */
+#menu-dropdown {
+  position: fixed;
+  top: 38px;
+  left: 6px;
+  min-width: 170px;
+  background: rgba(0,0,0,0.85);
+  border-radius: 6px;
+  padding: 4px 0;
+  display: none;
+  z-index: 29;
+  font-size: 13px;
+}
+.menu-item {
+  padding: 6px 12px;
+  color: #ffffff;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.menu-item:hover {
+  background: rgba(255,255,255,0.12);
+}
+
+/* Holding / background area */
+#bg-area {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 80%;
+  height: 75vh;
+  background: var(--bg-main);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 0;
+}
+#bg-logo {
+  max-width: 60%;
+  max-height: 60%;
+  opacity: 0.18;
+  cursor: pointer;
+}
+
+/* Sidebar */
+#sidebar {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 20%;
+  height: 100vh;
+  background: var(--bg-main);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 0;
+  overflow-y: auto;
+  z-index: 2;
+}
+
+/* Sidebar logos block */
+#sidebar-logos-wrapper {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  margin-top: 16px;
+  margin-bottom: 8px;
+}
+#sidebar-logos-inner {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+}
+.sidebar-logo {
+  height: 60px;
+  max-width: 90px;
+  object-fit: contain;
+}
+#sidebar-divider {
+  width: 85%;
+  height: 1px;
+  background: rgba(255,255,255,0.3);
+  margin: 6px 0 8px 0;
+  display: none; /* optional divider toggle */
+}
+
+/* Pot title */
+#pot-title {
+  font-weight: 600;
+  color: var(--text-sidebar-title);
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+/* Sidebar player list */
+#player-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.player {
+  width: 90%;
+  background: var(--bg-unpicked);
+  color: var(--text-slot);
+  margin: 2px 0;
+  padding: 2px 4px;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  min-height: 34px;
+}
+.player.drawn {
+  opacity: 0.4;
+  cursor: default;
+}
+.player .flag-box {
+  width: 36px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  line-height: 1;
+  margin-right: 6px;
+  padding: 0;
+}
+
+/* Lower third area */
+#lower-third {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 80%;
+  height: 25vh;
+  background: var(--bg-main);
+  display: flex;
+  gap: 8px;
+  padding: 10px;
+  box-sizing: border-box;
+  z-index: 2;
+}
+.group {
+  flex: 1;
+  background: var(--bg-group);
+  border-radius: 4px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.group.hidden {
+  display: none;
+}
+.group h2 {
+  margin: 0 0 5px 0;
+  color: var(--text-group-header);
+  text-align: center;
+  font-size: 16px;
+}
+
+/* Slots */
+.slot {
+  height: 28px;
+  background: var(--bg-unpicked);
+  border-radius: 5px;
+  overflow: hidden;
+  position: relative;
+}
+.slot .player-card {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  padding-left: 4px;
+  background: var(--bg-picked);
+  color: var(--text-slot);
+  transform: translateX(-100%);
+  opacity: 0;
+  transition: transform 0.7s ease, opacity 0.7s ease;
+}
+.slot.active .player-card {
+  transform: translateX(0);
+  opacity: 1;
+}
+.slot .player-card .flag-box {
+  width: 24px;
+  height: 16px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-right: 4px;
+  font-size: 14px;
+  line-height: 1;
+}
+
+/* Final draw screen */
+#final-screen {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.85);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  box-sizing: border-box;
+  z-index: 25;
+}
+#final-inner {
+  width: 90%;
+  height: 90%;
+  background: var(--bg-main);
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  opacity: 0;
+  transition: transform 0.45s ease, opacity 0.45s ease;
+}
+#final-inner.slide-in {
+  transform: translateX(0);
+  opacity: 1;
+}
+#final-inner.slide-out {
+  transform: translateX(100%);
+  opacity: 0;
+}
+
+/* Final header logos, centred as a block */
+#final-logo-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.final-logo {
+  max-height: 120px;
+  object-fit: contain;
+}
+
+/* Final title */
+#final-header {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 12px;
+}
+#final-title {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text-group-header);
+  text-align: center;
+  width: 100%;
+}
+
+/* Final content grid */
+#final-content {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+.final-page {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-auto-rows: minmax(160px, auto);
+  gap: 10px;
+  transition: transform 0.45s ease;
+}
+
+/* Group box on final screen */
+.final-group-box {
+  background: var(--bg-group);
+  border-radius: 4px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+}
+.final-group-box h3 {
+  margin: 0 0 8px 0;
+  text-align: center;
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text-group-header);
+}
+
+/* Team rows on final screen */
+.final-team {
+  background: var(--bg-unpicked);
+  margin: 3px 0;
+  padding: 3px 6px;
+  display: flex;
+  align-items: center;
+  border-radius: 4px;
+  gap: 6px;
+  min-height: 26px;
+  color: var(--text-slot);
+}
+.final-team .flag-box {
+  width: 30px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  line-height: 1;
+  margin-right: 6px;
+}
+
+/* Final nav: X, <, > */
+#final-close-btn {
+  position: absolute;
+  transform: translateX(400%);
+  transform: translateY(-200%);
+  top: 10px;
+  right: 18px;
+  font-size: 20px;
+  color: var(--text-slot);
+  cursor: pointer;
+  opacity: 0.2;
+  z-index: 26;
+}
+#final-close-btn:hover {
+  opacity: 0.2;
+}
+#final-prev-btn {
+  position: fixed;
+  top: 50%;
+  transform: translateX(-120%);
+  font-size: 32px;
+  color: var(--text-slot);
+  cursor: pointer;
+  opacity: 0.35;
+  z-index: 30;
+  padding: 6px;
+}
+
+#final-next-btn {
+  position: fixed;
+  top: 50%;
+  transform: translateX(120%);
+  font-size: 32px;
+  color: var(--text-slot);
+  cursor: pointer;
+  opacity: 0.35;
+  z-index: 30;
+  padding: 6px;
+}
+
+#final-prev-btn {
+  left: 6px;
+}
+
+#final-next-btn {
+  right: 6px;
+}
+
+#final-prev-btn:hover,
+#final-next-btn:hover {
+  opacity: 0.85;
+}
+
+/* Import / Config overlay */
+#import-screen {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.8);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 20;
+}
+#import-inner {
+  width: 80%;
+  max-width: 960px;
+  max-height: 90vh;
+  background: #074329;
+  border-radius: 8px;
+  padding: 16px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  color: var(--text-color);
+}
+#import-inner h2 {
+  margin: 0 0 6px 0;
+  text-align: center;
+  font-size: 20px;
+}
+#import-inner p {
+  margin: 4px 0;
+  font-size: 13px;
+}
+
+/* Config layout */
+.config-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.config-field {
+  flex: 0 1 180px;
+  font-size: 12px;
+}
+.config-field.wide {
+  flex: 1 1 260px;
+}
+.config-field label {
+  display: block;
+  margin-bottom: 2px;
+}
+.config-field input,
+.config-field select {
+  width: 100%;
+  font-size: 12px;
+}
+
+/* Checkbox row */
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 8px 0;
+  font-size: 12px;
+}
+
+/* Appearance section */
+#appearance-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 8px 0;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255,255,255,0.25);
+}
+.appearance-field {
+  flex: 0 1 180px;
+  font-size: 12px;
+}
+.appearance-field.wide {
+  flex: 1 1 260px;
+}
+.appearance-field label {
+  display: block;
+  margin-bottom: 2px;
+}
+.appearance-field input[type="color"],
+.appearance-field input[type="text"],
+.appearance-field select {
+  width: 100%;
+  font-size: 12px;
+}
+
+/* CSV area */
+#csv-input {
+  width: 100%;
+  height: 120px;
+  resize: vertical;
+  font-family: monospace;
+  font-size: 13px;
+  margin-top: 8px;
+}
+#import-buttons {
+  margin-top: 8px;
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+}
+.import-btn {
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  background: var(--bg-unpicked);
+  color: var(--text-slot);
+  font-weight: 600;
+  font-size: 13px;
+}
+#import-right-buttons {
+  display: flex;
+  gap: 6px;
+}
+#csv-error {
+  margin-top: 6px;
+  color: #ffdddd;
+  font-size: 13px;
+  min-height: 16px;
+}
+#csv-preview {
+  margin-top: 10px;
+  background: #0c5a38;
+  padding: 8px;
+  border-radius: 4px;
+  max-height: 220px;
+  overflow: auto;
+  font-size: 12px;
+}
+#csv-preview table {
+  width: 100%;
+  border-collapse: collapse;
+}
+#csv-preview th,
+#csv-preview td {
+  border: 1px solid rgba(255,255,255,0.2);
+  padding: 3px 4px;
+  text-align: left;
+}
+#csv-preview th {
+  background: rgba(0,0,0,0.25);
+}
+#import-hint {
+  font-size: 12px;
+  opacity: 0.85;
+}
+.pot-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  min-width: 28px;
+  height: 22px;
+
+  padding: 3px 3px;
+  margin-right: 3px;
+
+  font-size: 16px;
+  font-weight: 400;
+
+  border-radius: 6px;
+
+  background: rgba(0, 0, 0, 0.25);
+  color: #ffffff;
+
+  flex-shrink: 0;
+}
+</style>
+</head>
+<body>
+
+<div id="menu-button">⚙️</div>
+<div id="menu-dropdown">
+  <div class="menu-item" id="menu-show-final">Show Finalised Draw</div>
+  <div class="menu-item" id="menu-undo">Undo Last Team</div>
+  <div class="menu-item" id="menu-configure">Configure Tournament</div>
+  <div class="menu-item" id="menu-export-config">Download config</div>
+  <div class="menu-item" id="menu-import-config">Load config</div>
+<input type="file" id="config-file-input" accept=".txt" style="display:none;">
+</div>
+
+<!-- Holding / background (quick draw trigger) -->
+<div id="bg-area">
+  <img id="bg-logo" src="" alt="Primary Logo">
+</div>
+
+<!-- Sidebar -->
+<div id="sidebar">
+  <div id="sidebar-logos-wrapper">
+    <div id="sidebar-logos-inner">
+      <img id="sidebar-primary-logo" class="sidebar-logo" src="" alt="Primary Logo">
+      <img id="sidebar-secondary-logo" class="sidebar-logo" src="" alt="Secondary Logo" style="display:none;">
+    </div>
+  </div>
+  <div id="sidebar-divider"></div>
+
+  <div id="pot-title">Pot 1</div>
+  <div id="player-list"></div>
+</div>
+
+<!-- Lower third dynamic container -->
+<div id="lower-third"></div>
+
+<!-- Final draw screen -->
+<div id="final-screen">
+  <div id="final-inner">
+    <div id="final-close-btn">✕</div>
+    <div id="final-prev-btn" style="display:none;">◀</div>
+    <div id="final-next-btn" style="display:none;">▶</div>
+
+    <div id="final-logo-row">
+      <img id="final-primary-logo" class="final-logo" src="" alt="Primary Logo">
+      <img id="final-secondary-logo" class="final-logo" src="" alt="Secondary Logo" style="display:none;">
+    </div>
+    <div id="final-header">
+      <div id="final-title">Tournament Draw</div>
+    </div>
+    <div id="final-content"></div>
+  </div>
+</div>
+
+<!-- Import / Config overlay -->
+<div id="import-screen">
+  <div id="import-inner">
+    <h2>Tools – Tournament Setup &amp; Team Import</h2>
+
+    <!-- Tournament name -->
+    <div class="config-row">
+      <div class="config-field wide">
+        <label for="cfg-tournament-name">Tournament name</label>
+        <input type="text" id="cfg-tournament-name" value="2026 European Outdoor Molkky Championships">
+      </div>
+    </div>
+
+    <!-- BASIC CONFIG -->
+    <div class="config-row">
+      <div class="config-field">
+        <label for="cfg-num-groups">Number of groups (1–64)</label>
+        <input type="number" id="cfg-num-groups" min="1" max="64" value="4">
+      </div>
+      <div class="config-field">
+        <label for="cfg-dummy-teams">Dummy teams (if no CSV)</label>
+        <input type="number" id="cfg-dummy-teams" min="1" value="16">
+      </div>
+      <div class="config-field">
+        <label for="cfg-groups-block">Groups shown at once (2–6)</label>
+        <select id="cfg-groups-block">
+          <option value="2">2</option>
+          <option value="3">3</option>
+          <option value="4" selected>4</option>
+          <option value="5">5</option>
+          <option value="6">6</option>
+        </select>
+      </div>
+      <div class="config-field">
+        <label for="cfg-num-pots">Pots for open draws</label>
+        <input type="number" id="cfg-num-pots" min="1" value="2">
+      </div>
+	<div class="config-field">
+	  <label for="cfg-pots-page">Pots shown at once (final view)</label>
+	  <select id="cfg-pots-page">
+	    <option value="2">2</option>
+	    <option value="3">3</option>
+	    <option value="4" selected>4</option>
+	    <option value="5">5</option>
+	    <option value="6">6</option>
+	  </select>
+	</div>
+	<label style="display:flex;align-items:center;gap:6px;font-size:13px;">
+	  <input type="checkbox" id="toggleNumbering">
+	  Number teams
+	</label>
+    </div>
+
+    <div class="checkbox-row">
+      <input type="checkbox" id="cfg-enforce-multiples" checked>
+      <label for="cfg-enforce-multiples">
+        Enforce pot sizes as multiples of number of groups (open draws)
+      </label>
+    </div>
+
+    <!-- APPEARANCE / LOGOS -->
+    <p style="margin-top:6px;margin-bottom:2px;">Appearance &amp; Branding</p>
+    <div class="config-row">
+      <div class="config-field">
+        <label for="cfg-theme-preset">Theme preset</label>
+        <select id="cfg-theme-preset">
+          <option value="green">Green</option>
+          <option value="darkblue">Dark blue</option>
+          <option value="red">Red</option>
+          <option value="grey">Grey</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="appearance-row">
+      <div class="appearance-field">
+        <label for="cfg-bg-color">Background colour</label>
+        <input type="color" id="cfg-bg-color" value="#005c3a">
+      </div>
+      <div class="appearance-field">
+        <label for="cfg-group-bg-color">Group background colour</label>
+        <input type="color" id="cfg-group-bg-color" value="#0b6040">
+      </div>
+      <div class="appearance-field">
+        <label for="cfg-picked-color">Team picked colour</label>
+        <input type="color" id="cfg-picked-color" value="#1f7f54">
+      </div>
+      <div class="appearance-field">
+        <label for="cfg-unpicked-color">Team/slot unpicked colour</label>
+        <input type="color" id="cfg-unpicked-color" value="#2b8b5f">
+      </div>
+      <div class="appearance-field">
+        <label for="cfg-slot-text-color">Slot / team text colour</label>
+        <input type="color" id="cfg-slot-text-color" value="#ffffff">
+      </div>
+      <div class="appearance-field">
+        <label for="cfg-group-header-color">Group header text colour</label>
+        <input type="color" id="cfg-group-header-color" value="#ffffff">
+      </div>
+      <div class="appearance-field">
+        <label for="cfg-sidebar-title-color">Pot title text colour</label>
+        <input type="color" id="cfg-sidebar-title-color" value="#e0ffe9">
+      </div>
+
+      <!-- Logos same row -->
+      <div class="appearance-field wide">
+        <label for="cfg-primary-logo">Primary logo URL</label>
+        <input type="text" id="cfg-primary-logo"
+               value="https://static.wixstatic.com/media/734080_ed8a1303bfeb4de598f4283df28199ef~mv2.png/v1/fill/w_1680,h_840,al_c,q_95,enc_auto/IMO_Logo.png">
+      </div>
+      <div class="appearance-field wide">
+        <label for="cfg-secondary-logo">Secondary logo URL (optional)</label>
+        <input type="text" id="cfg-secondary-logo" value="">
+      </div>
+
+      <div class="appearance-field" style="flex:0 1 200px;">
+        <label>
+          <input type="checkbox" id="cfg-sidebar-divider">
+          Show divider beneath sidebar logos
+        </label>
+      </div>
+      <div class="appearance-field" style="flex:0 1 200px;">
+        <button class="import-btn" id="btn-apply-theme">Apply theme / logos</button>
+      </div>
+    </div>
+
+    <p id="import-hint">
+      Paste CSV with one team per line. Supported formats:
+      <br>• <code>Team</code>
+      <br>• <code>Team,Code</code> (2-letter ISO code, e.g. GB, FI, EE)
+      <br>• <code>Team,Code,Pot</code> (Pot is 1-based; if omitted = fully open draw)
+    </p>
+
+    <textarea id="csv-input" placeholder="Example:
+Great Britain,GB,1
+Finland,FI,1
+Tallinn Tigers,EE,2
+Sheffield Stags,GB,2"></textarea>
+
+    <div id="import-buttons">
+      <button class="import-btn" id="csv-cancel-btn">Close</button>
+      <div id="import-right-buttons">
+        <button class="import-btn" id="btn-show-final">Show finalised draw</button>
+        <button class="import-btn" id="csv-preview-btn">Preview CSV / Dummy</button>
+        <button class="import-btn" id="csv-apply-btn">Apply &amp; Close</button>
+      </div>
+    </div>
+
+    <div id="csv-error"></div>
+    <div id="csv-preview"></div>
+  </div>
+</div>
+
+<script>
+// ---- CONFIG OBJECT ----
+const config = {
+  numGroups: 4,
+  groupsPerBlock: 4,   // 2–6
+  numPotsOpen: 2,      // open-draw pots
+  dummyTeams: 16,
+  potsPerPage: 4
+};
+
+let numberTeamsInPot = false;
+
+// THEME / LOGO CONFIG
+const theme = {
+  bgMain: '#005c3a',
+  bgGroup: '#0b6040',
+  bgPicked: '#1f7f54',
+  bgUnpicked: '#2b8b5f',
+  textSlot: '#ffffff',
+  textGroupHeader: '#ffffff',
+  textSidebarTitle: '#e0ffe9',
+  primaryLogo: 'https://static.wixstatic.com/media/734080_ed8a1303bfeb4de598f4283df28199ef~mv2.png/v1/fill/w_1680,h_840,al_c,q_95,enc_auto/IMO_Logo.png',
+  secondaryLogo: '',
+  showSidebarDivider: false
+};
+
+let tournamentName = '2026 European Outdoor Molkky Championships';
+
+// ---- STATE ----
+let groupNames = [];        // e.g. ["A","B",...]
+let groupSizes = [];        // teams per group
+let groupCounts = [];       // how many placed
+let totalTeams = 16;        // current tournament team count
+let savedCsvText = '';
+
+let pots = [];              // array of arrays of {name, flag, drawn}
+let currentPot = 0;
+
+let currentGroupIndex = 0;  // pointer for fair rotation
+let isOpenDraw = false;
+let finalPageIndex = 0;
+let finalPotPageIndex = 0;
+
+// placement history for robust undo
+let placementHistory = [];  // {gIdx, slotNum, name, flag}
+
+// block tracking
+let blockGroups = [];        // per-block group indices
+let blockHitSets = [];       // per-block Set of group indices hit (this pot)
+let currentVisibleBlock = 0;
+
+const BLOCK_PAUSE = 1500;   // ms
+
+// DOM refs
+const menuButton      = document.getElementById('menu-button');
+const menuDropdown    = document.getElementById('menu-dropdown');
+const menuShowFinal   = document.getElementById('menu-show-final');
+const menuUndo        = document.getElementById('menu-undo');
+const menuConfigure   = document.getElementById('menu-configure');
+
+const bgLogo          = document.getElementById('bg-logo');
+
+const sidebarPrimaryLogo   = document.getElementById('sidebar-primary-logo');
+const sidebarSecondaryLogo = document.getElementById('sidebar-secondary-logo');
+const sidebarDivider       = document.getElementById('sidebar-divider');
+
+const potTitleEl      = document.getElementById('pot-title');
+const playerListEl    = document.getElementById('player-list');
+const lowerThird      = document.getElementById('lower-third');
+
+const finalScreen     = document.getElementById('final-screen');
+const finalInner      = document.getElementById('final-inner');
+const finalContent    = document.getElementById('final-content');
+const finalPrimaryLogo   = document.getElementById('final-primary-logo');
+const finalSecondaryLogo = document.getElementById('final-secondary-logo');
+const finalCloseBtn   = document.getElementById('final-close-btn');
+const finalPrevBtn    = document.getElementById('final-prev-btn');
+const finalNextBtn    = document.getElementById('final-next-btn');
+const finalTitle      = document.getElementById('final-title');
+
+const importScreen    = document.getElementById('import-screen');
+const cfgTournamentName = document.getElementById('cfg-tournament-name');
+const cfgNumGroups    = document.getElementById('cfg-num-groups');
+const cfgDummyTeams   = document.getElementById('cfg-dummy-teams');
+const cfgGroupsBlock  = document.getElementById('cfg-groups-block');
+const cfgNumPots      = document.getElementById('cfg-num-pots');
+const cfgEnforceMult  = document.getElementById('cfg-enforce-multiples');
+const cfgPotsPage = document.getElementById('cfg-pots-page');
+
+const cfgThemePreset  = document.getElementById('cfg-theme-preset');
+
+const cfgBgColor      = document.getElementById('cfg-bg-color');
+const cfgGroupBgColor = document.getElementById('cfg-group-bg-color');
+const cfgPickedColor  = document.getElementById('cfg-picked-color');
+const cfgUnpickedColor= document.getElementById('cfg-unpicked-color');
+const cfgSlotTextColor= document.getElementById('cfg-slot-text-color');
+const cfgGroupHeaderColor = document.getElementById('cfg-group-header-color');
+const cfgSidebarTitleColor = document.getElementById('cfg-sidebar-title-color');
+const cfgPrimaryLogo  = document.getElementById('cfg-primary-logo');
+const cfgSecondaryLogo= document.getElementById('cfg-secondary-logo');
+const cfgSidebarDiv   = document.getElementById('cfg-sidebar-divider');
+const btnApplyTheme   = document.getElementById('btn-apply-theme');
+
+const csvInput        = document.getElementById('csv-input');
+const csvPreviewDiv   = document.getElementById('csv-preview');
+const csvErrorDiv     = document.getElementById('csv-error');
+const csvPreviewBtn   = document.getElementById('csv-preview-btn');
+const csvApplyBtn     = document.getElementById('csv-apply-btn');
+const csvCancelBtn    = document.getElementById('csv-cancel-btn');
+const btnShowFinal    = document.getElementById('btn-show-final');
+
+// ---- THEME PRESETS ----
+function applyPreset(name) {
+  if (name === 'green') {
+    cfgBgColor.value           = '#005c3a';
+    cfgGroupBgColor.value      = '#0b6040';
+    cfgPickedColor.value       = '#1f7f54';
+    cfgUnpickedColor.value     = '#2b8b5f';
+    cfgSlotTextColor.value     = '#ffffff';
+    cfgGroupHeaderColor.value  = '#ffffff';
+    cfgSidebarTitleColor.value = '#e0ffe9';
+  } else if (name === 'darkblue') {
+    cfgBgColor.value           = '#001c3d';
+    cfgGroupBgColor.value      = '#002952';
+    cfgPickedColor.value       = '#0050a4';
+    cfgUnpickedColor.value     = '#00396f';
+    cfgSlotTextColor.value     = '#ffffff';
+    cfgGroupHeaderColor.value  = '#ffffff';
+    cfgSidebarTitleColor.value = '#d0e6ff';
+  } else if (name === 'red') {
+    cfgBgColor.value           = '#4a0000';
+    cfgGroupBgColor.value      = '#660000';
+    cfgPickedColor.value       = '#990000';
+    cfgUnpickedColor.value     = '#7d0000';
+    cfgSlotTextColor.value     = '#ffffff';
+    cfgGroupHeaderColor.value  = '#ffe5e5';
+    cfgSidebarTitleColor.value = '#ffcccc';
+  } else if (name === 'grey') {
+    cfgBgColor.value           = '#303030';
+    cfgGroupBgColor.value      = '#3a3a3a';
+    cfgPickedColor.value       = '#505050';
+    cfgUnpickedColor.value     = '#424242';
+    cfgSlotTextColor.value     = '#ffffff';
+    cfgGroupHeaderColor.value  = '#ffffff';
+    cfgSidebarTitleColor.value = '#dddddd';
+  }
+  applyTheme();
+}
+
+cfgThemePreset.addEventListener('change', () => {
+  applyPreset(cfgThemePreset.value);
+});
+
+const toggleNumbering = document.getElementById('toggleNumbering');
+
+toggleNumbering.addEventListener('change', () => {
+  numberTeamsInPot = toggleNumbering.checked;
+  renderSidebar();
+});
+
+// ---- THEME / LOGO APPLY ----
+function applyTheme() {
+  theme.bgMain      = cfgBgColor.value       || theme.bgMain;
+  theme.bgGroup     = cfgGroupBgColor.value  || theme.bgGroup;
+  theme.bgPicked    = cfgPickedColor.value   || theme.bgPicked;
+  theme.bgUnpicked  = cfgUnpickedColor.value || theme.bgUnpicked;
+  theme.textSlot        = cfgSlotTextColor.value        || theme.textSlot;
+  theme.textGroupHeader = cfgGroupHeaderColor.value     || theme.textGroupHeader;
+  theme.textSidebarTitle= cfgSidebarTitleColor.value    || theme.textSidebarTitle;
+  theme.primaryLogo   = cfgPrimaryLogo.value   || '';
+  theme.secondaryLogo = cfgSecondaryLogo.value || '';
+  theme.showSidebarDivider = cfgSidebarDiv.checked;
+
+  document.documentElement.style.setProperty('--bg-main', theme.bgMain);
+  document.documentElement.style.setProperty('--bg-group', theme.bgGroup);
+  document.documentElement.style.setProperty('--bg-picked', theme.bgPicked);
+  document.documentElement.style.setProperty('--bg-unpicked', theme.bgUnpicked);
+
+  document.documentElement.style.setProperty('--text-slot', theme.textSlot);
+  document.documentElement.style.setProperty('--text-group-header', theme.textGroupHeader);
+  document.documentElement.style.setProperty('--text-sidebar-title', theme.textSidebarTitle);
+  document.documentElement.style.setProperty('--text-color', theme.textSlot);
+
+  // logos
+  if (theme.primaryLogo) {
+    bgLogo.src = theme.primaryLogo;
+    sidebarPrimaryLogo.src = theme.primaryLogo;
+    finalPrimaryLogo.src = theme.primaryLogo;
+  } else {
+    bgLogo.src = '';
+    sidebarPrimaryLogo.src = '';
+    finalPrimaryLogo.src = '';
+  }
+
+  if (theme.secondaryLogo) {
+    sidebarSecondaryLogo.src = theme.secondaryLogo;
+    sidebarSecondaryLogo.style.display = 'block';
+    finalSecondaryLogo.src = theme.secondaryLogo;
+    finalSecondaryLogo.style.display = 'block';
+  } else {
+    sidebarSecondaryLogo.style.display = 'none';
+    finalSecondaryLogo.style.display = 'none';
+  }
+
+  sidebarDivider.style.display = theme.showSidebarDivider ? 'block' : 'none';
+}
+
+btnApplyTheme.onclick = () => {
+  applyTheme();
+};
+
+function applyThemeFromState() {
+  document.documentElement.style.setProperty('--bg-main', theme.bgMain);
+  document.documentElement.style.setProperty('--bg-group', theme.bgGroup);
+  document.documentElement.style.setProperty('--bg-picked', theme.bgPicked);
+  document.documentElement.style.setProperty('--bg-unpicked', theme.bgUnpicked);
+
+  document.documentElement.style.setProperty('--text-slot', theme.textSlot);
+  document.documentElement.style.setProperty('--text-group-header', theme.textGroupHeader);
+  document.documentElement.style.setProperty('--text-sidebar-title', theme.textSidebarTitle);
+  document.documentElement.style.setProperty('--text-color', theme.textSlot);
+}
+
+
+// ---- GROUP NAME GENERATOR (A..Z, AA, AB, ...) ----
+function generateGroupNames(n) {
+  const names = [];
+  let index = 0;
+  while (names.length < n) {
+    let s = '';
+    let x = index;
+    do {
+      s = String.fromCharCode(65 + (x % 26)) + s;
+      x = Math.floor(x / 26) - 1;
+    } while (x >= 0);
+    names.push(s);
+    index++;
+  }
+  return names;
+}
+
+// ---- BUILD GROUP STRUCTURE ----
+function computeGroupSizes() {
+  groupSizes = [];
+  groupCounts = [];
+
+  if (totalTeams <= 0) {
+    for (let i=0; i<config.numGroups; i++) {
+      groupSizes.push(0);
+      groupCounts.push(0);
+    }
+    return;
+  }
+
+  if (totalTeams < config.numGroups) {
+    for (let i=0; i<config.numGroups; i++) {
+      groupSizes.push(i < totalTeams ? 1 : 0);
+      groupCounts.push(0);
+    }
+    return;
+  }
+
+  const base = Math.floor(totalTeams / config.numGroups);
+  const extra = totalTeams % config.numGroups;
+  for (let i=0; i<config.numGroups; i++) {
+    const sz = base + (i < extra ? 1 : 0);
+    groupSizes.push(sz);
+    groupCounts.push(0);
+  }
+}
+
+function buildLowerThird() {
+  lowerThird.innerHTML = '';
+  for (let i=0; i<config.numGroups; i++) {
+    const gDiv = document.createElement('div');
+    gDiv.className = 'group';
+    gDiv.dataset.index = i.toString();
+
+    const h = document.createElement('h2');
+    h.textContent = `Group ${groupNames[i] || (i+1)}`;
+    gDiv.appendChild(h);
+
+    const slots = groupSizes[i] || 0;
+    for (let s=1; s<=slots; s++) {
+      const slot = document.createElement('div');
+      slot.className = 'slot';
+      slot.id = `slot-${i}-${s}`;
+      gDiv.appendChild(slot);
+    }
+
+    lowerThird.appendChild(gDiv);
+  }
+
+  recomputeBlocks();
+}
+
+// ---- BLOCK LOGIC ----
+function recomputeBlocks() {
+  const gpb = config.groupsPerBlock;
+  blockGroups = [];
+
+  let b = 0;
+  while (true) {
+    const start = b * gpb;
+    if (start >= config.numGroups) break;
+    const end = Math.min(start + gpb, config.numGroups);
+    const indices = [];
+    for (let i=start; i<end; i++) {
+      if ((groupSizes[i] || 0) > 0) indices.push(i);
+    }
+    blockGroups.push(indices);
+    b++;
+  }
+
+  resetBlockHits();
+  currentVisibleBlock = 0;
+  showGroupBlock(0);
+}
+
+function resetBlockHits() {
+  blockHitSets = blockGroups.map(() => new Set());
+}
+
+function showGroupBlock(blockIndex) {
+  const groups = [...document.querySelectorAll('.group')];
+  const gpb = config.groupsPerBlock;
+  groups.forEach(g => {
+    const idx = parseInt(g.dataset.index || '0', 10);
+    const block = Math.floor(idx / gpb);
+    g.classList.toggle('hidden', block !== blockIndex);
+  });
+  currentVisibleBlock = blockIndex;
+}
+
+// ---- SIDEBAR RENDER ----
+function renderSidebar() {
+  playerListEl.innerHTML = '';
+  if (currentPot >= pots.length) {
+    potTitleEl.textContent = isOpenDraw ? 'Open draw complete' : 'Draw complete';
+    return;
+  }
+
+  if (isOpenDraw) {
+    potTitleEl.textContent = `Open pot ${currentPot+1} of ${pots.length}`;
+  } else {
+    potTitleEl.textContent = `Pot ${currentPot+1} of ${pots.length}`;
+  }
+
+  const potArr = pots[currentPot] || [];
+	potArr.forEach((t, i) => {
+	  const div = document.createElement('div');
+	  div.className = 'player' + (t.drawn ? ' drawn' : '');
+
+	  const numberHtml = numberTeamsInPot
+ 	   ? `<span class="pot-number">${i + 1}</span>`
+ 	   : '';
+
+	  const flagHtml = t.flag ? `<div class="flag-box">${t.flag}</div>` : '';
+
+ 	 div.innerHTML = `
+ 	   ${numberHtml}
+ 	   ${flagHtml}
+ 	   <span>${t.name}</span>
+	  `;
+
+	  if (!t.drawn) {
+ 	   div.onclick = () => pickTeam(i);
+ 	 }
+
+  playerListEl.appendChild(div);
+});
+
+}
+
+// ---- NEXT GROUP TO FILL ----
+function getNextGroupIndex() {
+  for (let i=0; i<config.numGroups; i++) {
+    const idx = (currentGroupIndex + i) % config.numGroups;
+    if (groupCounts[idx] < (groupSizes[idx] || 0)) return idx;
+  }
+  return null;
+}
+
+// ---- BLOCK HITS AFTER PLACEMENT ----
+function updateBlockHitsAfterPlacement(gIdx) {
+  const gpb = config.groupsPerBlock;
+  if (gpb <= 0) return;
+
+  const blockIndex = Math.floor(gIdx / gpb);
+  if (!blockGroups[blockIndex]) return;
+
+  if ((groupSizes[gIdx] || 0) === 0) return;
+
+  const set = blockHitSets[blockIndex];
+  if (!set.has(gIdx)) {
+    set.add(gIdx);
+    const needed = blockGroups[blockIndex].length;
+    if (needed > 0 && set.size >= needed && blockIndex === currentVisibleBlock) {
+      const nextBlock = blockIndex + 1;
+      if (nextBlock < blockGroups.length) {
+        setTimeout(() => {
+          showGroupBlock(nextBlock);
+        }, BLOCK_PAUSE);
+      } else {
+        setTimeout(() => {
+          showGroupBlock(0);
+        }, BLOCK_PAUSE);
+      }
+    }
+  }
+}
+
+// ---- PLACE TEAM ----
+function placeTeam(t) {
+  const gIdx = getNextGroupIndex();
+  if (gIdx === null) return null;
+
+  groupCounts[gIdx]++;
+  const slotNum = groupCounts[gIdx];
+  const slot = document.getElementById(`slot-${gIdx}-${slotNum}`);
+  if (!slot) return gIdx;
+
+  slot.dataset.flag = t.flag || '';
+  slot.dataset.name = t.name || '';
+
+  const card = document.createElement('div');
+  card.className = 'player-card';
+  const flagHtml = t.flag ? `<div class="flag-box">${t.flag}</div>` : '';
+  card.innerHTML = `${flagHtml}<span>${t.name}</span>`;
+  slot.appendChild(card);
+
+  // record in history for robust undo
+  placementHistory.push({
+    gIdx,
+    slotNum,
+    name: t.name,
+    flag: t.flag || ''
+  });
+
+  setTimeout(() => slot.classList.add('active'), 50);
+
+  currentGroupIndex = (gIdx + 1) % config.numGroups;
+  return gIdx;
+}
+
+// ---- PICK TEAM ----
+function pickTeam(i) {
+  if (currentPot >= pots.length) return;
+  const potArr = pots[currentPot] || [];
+  const t = potArr[i];
+  if (!t || t.drawn) return;
+
+  t.drawn = true;
+
+  const gIdx = placeTeam(t);
+  if (gIdx !== null && gIdx !== undefined) {
+    updateBlockHitsAfterPlacement(gIdx);
+  }
+
+  // Always redraw immediately so the picked player dims straight away
+  renderSidebar();
+
+  // If this was the last team in the pot, delay moving to the next pot
+  if (potArr.every(tt => tt.drawn)) {
+    setTimeout(() => {
+      currentPot++;
+      resetBlockHits();
+      showGroupBlock(0);
+      renderSidebar();
+    }, BLOCK_PAUSE);
+  }
+}
+
+// ---- UNDO LAST TEAM (USING HISTORY STACK) ----
+function undoLastTeam() {
+  if (!placementHistory.length) return;
+
+  const last = placementHistory.pop();
+  const { gIdx, slotNum, name, flag } = last;
+
+  if (!pots.length) return;
+  let potIndex = currentPot;
+  if (potIndex >= pots.length) potIndex = pots.length - 1;
+  if (potIndex < 0) potIndex = 0;
+
+  pots[potIndex].push({
+    name,
+    flag,
+    drawn: false
+  });
+
+  const slot = document.getElementById(`slot-${gIdx}-${slotNum}`);
+  if (slot) {
+    slot.innerHTML = '';
+    slot.classList.remove('active');
+    delete slot.dataset.name;
+    delete slot.dataset.flag;
+  }
+
+  groupCounts[gIdx] = Math.max(0, slotNum - 1);
+  currentGroupIndex = gIdx;
+
+  const gpb = config.groupsPerBlock;
+  const blockIndex = Math.floor(gIdx / gpb);
+  if (blockHitSets[blockIndex]) {
+    blockHitSets[blockIndex].delete(gIdx);
+  }
+
+  renderSidebar();
+}
+
+// ---- QUICK DRAW ----
+function quickDraw() {
+  for (let p=currentPot; p<pots.length; p++) {
+    const potArr = pots[p] || [];
+    for (const t of potArr) {
+      if (t.drawn) continue;
+      t.drawn = true;
+      placeTeam(t);
+    }
+    currentPot = p+1;
+    resetBlockHits();
+    showGroupBlock(0);
+  }
+  renderSidebar();
+}
+
+function computePotPages() {
+  const perPage = config.potsPerPage || 4;
+  const pages = [];
+
+  for (let i = 0; i < pots.length; i += perPage) {
+    pages.push(pots.slice(i, i + perPage));
+  }
+
+  return pages;
+}
+
+// ---- FINAL SCREEN PAGE COMPUTATION ----
+function computeFinalPages() {
+  const gpb = config.groupsPerBlock;
+  const perPage = gpb * 2;
+  const pages = [];
+  let currentPage = [];
+
+  for (let i=0; i<config.numGroups; i++) {
+    if ((groupSizes[i] || 0) <= 0) continue;
+    currentPage.push(i);
+    if (currentPage.length >= perPage) {
+      pages.push(currentPage);
+      currentPage = [];
+    }
+  }
+  if (currentPage.length > 0) pages.push(currentPage);
+  return pages;
+}
+
+function renderFinalPage(direction='none') {
+  finalContent.innerHTML = '';
+  const pages = computeFinalPages();
+  if (pages.length === 0) {
+    finalPrevBtn.style.display = 'none';
+    finalNextBtn.style.display = 'none';
+    return;
+  }
+  if (finalPageIndex >= pages.length) finalPageIndex = 0;
+
+  finalPrevBtn.style.display = pages.length > 1 ? 'block' : 'none';
+  finalNextBtn.style.display = pages.length > 1 ? 'block' : 'none';
+
+  const groupIndices = pages[finalPageIndex];
+  const gpb = config.groupsPerBlock;
+
+  const pageDiv = document.createElement('div');
+  pageDiv.className = 'final-page';
+  pageDiv.style.gridTemplateColumns = `repeat(${gpb}, 1fr)`;
+
+  if (direction === 'next') {
+    pageDiv.style.transform = 'translateX(100%)';
+  } else if (direction === 'prev') {
+    pageDiv.style.transform = 'translateX(-100%)';
+  } else {
+    pageDiv.style.transform = 'translateX(0)';
+  }
+
+  groupIndices.forEach((gIdx) => {
+    const box = document.createElement('div');
+    box.className = 'final-group-box';
+
+    const name = groupNames[gIdx] || (gIdx+1);
+    box.innerHTML = `<h3>Group ${name}</h3>`;
+
+    const size = groupSizes[gIdx] || 0;
+    for (let s=1; s<=size; s++) {
+      const slot = document.getElementById(`slot-${gIdx}-${s}`);
+      const flag = slot?.dataset.flag || '';
+      const teamName = slot?.dataset.name || '';
+      const row = document.createElement('div');
+      row.className = 'final-team';
+      if (!teamName) {
+        row.textContent = '—';
+      } else {
+        const flagHtml = flag ? `<div class="flag-box">${flag}</div>` : '';
+        row.innerHTML = `${flagHtml}<span>${teamName}</span>`;
+      }
+      box.appendChild(row);
+    }
+
+    pageDiv.appendChild(box);
+  });
+
+  finalContent.appendChild(pageDiv);
+  void pageDiv.offsetWidth;
+  pageDiv.style.transform = 'translateX(0)';
+}
+
+function renderPotOverviewPage(direction = 'none') {
+  finalContent.innerHTML = '';
+
+  const pages = computePotPages();
+  if (pages.length === 0) return;
+
+  if (finalPotPageIndex >= pages.length) finalPotPageIndex = 0;
+
+  finalPrevBtn.style.display = pages.length > 1 ? 'block' : 'none';
+  finalNextBtn.style.display = pages.length > 1 ? 'block' : 'none';
+
+  const perPage = Math.min(6, Math.max(2, parseInt(config.potsPerPage, 10) || 4));
+  const pagePots = pages[finalPotPageIndex];
+
+  const Fcols = Math.min(6, Math.max(2, parseInt(config.groupsPerBlock, 10) || 4));
+  const Ocols = pagePots.length;
+
+  const pageDiv = document.createElement('div');
+  pageDiv.className = 'final-page';
+
+  if (Ocols <= Fcols) {
+    pageDiv.style.width = `${(Ocols / Fcols) * 100}%`;
+    pageDiv.style.margin = '0 auto';
+    pageDiv.style.gridTemplateColumns = `repeat(${Ocols}, 1fr)`;
+  } else {
+    pageDiv.style.width = '100%';
+    pageDiv.style.gridTemplateColumns = `repeat(${Ocols}, 1fr)`;
+  }
+
+  if (direction === 'next') pageDiv.style.transform = 'translateX(100%)';
+  if (direction === 'prev') pageDiv.style.transform = 'translateX(-100%)';
+
+  pagePots.forEach((pot, idx) => {
+    const potIndex = finalPotPageIndex * perPage + idx;
+
+    const box = document.createElement('div');
+    box.className = 'final-group-box';
+    box.innerHTML = `<h3>Pot ${potIndex + 1}</h3>`;
+
+    pot.forEach((t, i) => {
+      const row = document.createElement('div');
+      row.className = 'final-team';
+      row.innerHTML = `
+        <span class="pot-number">${i + 1}</span>
+        ${t.flag ? `<div class="flag-box">${t.flag}</div>` : ''}
+        <span>${t.name}</span>
+      `;
+      box.appendChild(row);
+    });
+
+    pageDiv.appendChild(box);
+  });
+
+  finalContent.appendChild(pageDiv);
+  void pageDiv.offsetWidth;
+  pageDiv.style.transform = 'translateX(0)';
+}
+
+
+function computePotPages() {
+  const perPage = Math.min(6, Math.max(2, parseInt(config.potsPerPage, 10) || 4));
+  const pages = [];
+  for (let i = 0; i < pots.length; i += perPage) {
+    pages.push(pots.slice(i, i + perPage));
+  }
+  return pages;
+}
+
+
+function updateFinalTitle() {
+  if (finalViewMode === 'pots') {
+    finalTitle.textContent = (tournamentName || 'Tournament') + ' – Initial Pots';
+  } else {
+    finalTitle.textContent = (tournamentName || 'Tournament') + ' Draw';
+  }
+}
+
+// ---- FINAL SCREEN CONTROLS ----
+function updateFinalTitle() {
+  finalTitle.textContent = (tournamentName || 'Tournament') + ' Draw';
+}
+
+function openFinalScreen() {
+  updateFinalTitle();
+  finalScreen.style.display = 'flex';
+  finalInner.classList.remove('slide-out');
+  finalPageIndex = 0;
+
+  if (finalViewMode === 'groups') {
+    renderFinalPage();
+  } else {
+    renderPotOverviewPage();
+  }
+
+  void finalInner.offsetWidth;
+  finalInner.classList.add('slide-in');
+}
+
+
+function closeFinalScreen() {
+  finalInner.classList.remove('slide-in');
+  finalInner.classList.add('slide-out');
+  setTimeout(() => {
+    finalScreen.style.display = 'none';
+    finalInner.classList.remove('slide-out');
+  }, 450);
+}
+
+finalCloseBtn.onclick = () => closeFinalScreen();
+
+finalPrevBtn.onclick = () => {
+  if (finalViewMode === 'groups') {
+    const pages = computeFinalPages();
+    if (pages.length <= 1) return;
+    finalPageIndex = (finalPageIndex - 1 + pages.length) % pages.length;
+    renderFinalPage('prev');
+  } else {
+    const pages = computePotPages();
+    if (pages.length <= 1) return;
+    finalPotPageIndex = (finalPotPageIndex - 1 + pages.length) % pages.length;
+    renderPotOverviewPage('prev');
+  }
+};
+
+finalNextBtn.onclick = () => {
+  if (finalViewMode === 'groups') {
+    const pages = computeFinalPages();
+    if (pages.length <= 1) return;
+    finalPageIndex = (finalPageIndex + 1) % pages.length;
+    renderFinalPage('next');
+  } else {
+    const pages = computePotPages();
+    if (pages.length <= 1) return;
+    finalPotPageIndex = (finalPotPageIndex + 1) % pages.length;
+    renderPotOverviewPage('next');
+  }
+};
+
+// ---- MENU DROPDOWN ----
+function toggleMenuDropdown() {
+  menuDropdown.style.display = (menuDropdown.style.display === 'block') ? 'none' : 'block';
+}
+
+menuButton.onclick = (e) => {
+  e.stopPropagation();
+  toggleMenuDropdown();
+};
+
+document.addEventListener('click', (e) => {
+  if (!menuDropdown.contains(e.target) && e.target !== menuButton) {
+    menuDropdown.style.display = 'none';
+  }
+});
+
+menuShowFinal.onclick = () => {
+  menuDropdown.style.display = 'none';
+  openFinalScreen();
+};
+
+menuUndo.onclick = () => {
+  menuDropdown.style.display = 'none';
+  undoLastTeam();
+};
+
+menuConfigure.onclick = () => {
+  menuDropdown.style.display = 'none';
+  syncConfigUIFromState();    
+  importScreen.style.display = 'flex';
+  csvErrorDiv.textContent = '';
+  csvPreviewDiv.innerHTML = '';
+};
+
+// Show finalised draw from inside settings
+btnShowFinal.onclick = () => {
+  importScreen.style.display = 'none';
+  openFinalScreen();
+};
+
+// cancel / close config
+csvCancelBtn.onclick = () => {
+  importScreen.style.display = 'none';
+};
+
+// ---- ISO3 -> ISO2 TABLE (+ Kosovo), GBR -> GB ----
+const iso3to2 = {
+  AFG:"AF", ALA:"AX", ALB:"AL", DZA:"DZ", ASM:"AS", AND:"AD", AGO:"AO", AIA:"AI",
+  ATA:"AQ", ATG:"AG", ARG:"AR", ARM:"AM", ABW:"AW", AUS:"AU", AUT:"AT", AZE:"AZ",
+  BHS:"BS", BHR:"BH", BGD:"BD", BRB:"BB", BLR:"BY", BEL:"BE", BLZ:"BZ", BEN:"BJ",
+  BMU:"BM", BTN:"BT", BOL:"BO", BES:"BQ", BIH:"BA", BWA:"BW", BVT:"BV", BRA:"BR",
+  IOT:"IO", BRN:"BN", BGR:"BG", BFA:"BF", BDI:"BI", CPV:"CV", KHM:"KH", CMR:"CM",
+  CAN:"CA", CYM:"KY", CAF:"CF", TCD:"TD", CHL:"CL", CHN:"CN", CXR:"CX", CCK:"CC",
+  COL:"CO", COM:"KM", COG:"CG", COD:"CD", COK:"CK", CRI:"CR", CIV:"CI", HRV:"HR",
+  CUB:"CU", CUW:"CW", CYP:"CY", CZE:"CZ", DNK:"DK", DJI:"DJ", DMA:"DM", DOM:"DO",
+  ECU:"EC", EGY:"EG", SLV:"SV", GNQ:"GQ", ERI:"ER", EST:"EE", SWZ:"SZ", ETH:"ET",
+  FLK:"FK", FRO:"FO", FJI:"FJ", FIN:"FI", FRA:"FR", GUF:"GF", PYF:"PF", ATF:"TF",
+  GAB:"GA", GMB:"GM", GEO:"GE", DEU:"DE", GHA:"GH", GIB:"GI", GRC:"GR", GRL:"GL",
+  GRD:"GD", GLP:"GP", GUM:"GU", GTM:"GT", GGY:"GG", GIN:"GN", GNB:"GW", GUY:"GY",
+  HTI:"HT", HMD:"HM", VAT:"VA", HND:"HN", HKG:"HK", HUN:"HU", ISL:"IS", IND:"IN",
+  IDN:"ID", IRN:"IR", IRQ:"IQ", IRL:"IE", IMN:"IM", ISR:"IL", ITA:"IT", JAM:"JM",
+  JPN:"JP", JEY:"JE", JOR:"JO", KAZ:"KZ", KEN:"KE", KIR:"KI", PRK:"KP", KOR:"KR",
+  KWT:"KW", KGZ:"KG", LAO:"LA", LVA:"LV", LBN:"LB", LSO:"LS", LBR:"LR", LBY:"LY",
+  LIE:"LI", LTU:"LT", LUX:"LU", MAC:"MO", MDG:"MG", MWI:"MW", MYS:"MY", MDV:"MV",
+  MLI:"ML", MLT:"MT", MHL:"MH", MTQ:"MQ", MRT:"MR", MUS:"MU", MYT:"YT", MEX:"MX",
+  FSM:"FM", MDA:"MD", MCO:"MC", MNG:"MN", MNE:"ME", MSR:"MS", MAR:"MA", MOZ:"MZ",
+  MMR:"MM", NAM:"NA", NRU:"NR", NPL:"NP", NLD:"NL", NCL:"NC", NZL:"NZ", NIC:"NI",
+  NER:"NE", NGA:"NG", NIU:"NU", NFK:"NF", MKD:"MK", MNP:"MP", NOR:"NO", OMN:"OM",
+  PAK:"PK", PLW:"PW", PSE:"PS", PAN:"PA", PNG:"PG", PRY:"PY", PER:"PE", PHL:"PH",
+  PCN:"PN", POL:"PL", PRT:"PT", PRI:"PR", QAT:"QA", REU:"RE", ROU:"RO", RUS:"RU",
+  RWA:"RW", BLM:"BL", SHN:"SH", KNA:"KN", LCA:"LC", MAF:"MF", SPM:"PM", VCT:"VC",
+  WSM:"WS", SMR:"SM", STP:"ST", SAU:"SA", SEN:"SN", SRB:"RS", SYC:"SC", SLE:"SL",
+  SGP:"SG", SXM:"SX", SVK:"SK", SVN:"SI", SLB:"SB", SOM:"SO", ZAF:"ZA", SGS:"GS",
+  SSD:"SS", ESP:"ES", LKA:"LK", SDN:"SD", SUR:"SR", SJM:"SJ", SWE:"SE", CHE:"CH",
+  SYR:"SY", TWN:"TW", TJK:"TJ", TZA:"TZ", THA:"TH", TLS:"TL", TGO:"TG", TKL:"TK",
+  TON:"TO", TTO:"TT", TUN:"TN", TUR:"TR", TKM:"TM", TCA:"TC", TUV:"TV", UGA:"UG",
+  UKR:"UA", ARE:"AE", GBR:"GB", USA:"US", UMI:"UM", URY:"UY", UZB:"UZ", VUT:"VU",
+  VEN:"VE", VNM:"VN", VGB:"VG", VIR:"VI", WLF:"WF", ESH:"EH", YEM:"YE", ZMB:"ZM",
+  ZWE:"ZW",
+  // Kosovo (not official ISO but widely used)
+  XKX:"XK"
+};
+
+// ---- 2-LETTER CODE -> EMOJI FLAG ----
+function buildTeamDisplay(name, codeField) {
+  const codes = (codeField || '')
+    .split(/[\/+;&|]+/)
+    .map(c => c.trim())
+    .filter(Boolean);
+
+  const flags = codes.map(c => {
+    c = c.toUpperCase();
+
+    if (/^[A-Z]{2}$/.test(c)) {
+      return codeToFlag(c);
+    }
+
+    if (/^[A-Z]{3}$/.test(c) && iso3to2[c]) {
+      return codeToFlag(iso3to2[c]);
+    }
+
+    return '';
+  });
+
+  const players = name.split('/').map(p => p.trim());
+
+  // If we have one code per player, prefix each player
+  if (players.length === flags.length && flags.length > 1) {
+    return {
+      flag: '',
+      name: players
+        .map((p, i) => `${flags[i]} ${p}`)
+        .join(' / ')
+    };
+  }
+
+  // Otherwise use the existing single flag box
+  return {
+    flag: flags[0] || '',
+    name
+  };
+}
+
+// ---- CSV PARSING ----
+function parseCSV(text) {
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l.length>0);
+  if (lines.length === 0) throw new Error('No non-empty lines found.');
+  const rows = [];
+  let hasPot = false;
+
+  let startIndex = 0;
+  const firstParts = lines[0].split(',').map(s => s.trim().toLowerCase());
+  const isHeader = firstParts.some(p => p.includes('team') || p.includes('name'));
+  if (isHeader) startIndex = 1;
+
+  for (let i=startIndex; i<lines.length; i++) {
+    const parts = lines[i].split(',').map(s => s.trim());
+    if (!parts[0]) continue;
+    const team = parts[0];
+    const code = parts[1] || '';
+    const potStr = parts[2] || '';
+
+    let flag = '';
+
+    if (/^[A-Za-z]{2}$/.test(code)) {
+      flag = codeToFlag(code);
+    } else if (/^[A-Za-z]{3}$/.test(code)) {
+      const upper = code.toUpperCase();
+      if (iso3to2[upper]) {
+        flag = codeToFlag(iso3to2[upper]);
+      }
+    }
+
+    let pot = null;
+    if (potStr) {
+      const pNum = parseInt(potStr, 10);
+      if (!Number.isNaN(pNum) && pNum > 0) {
+        pot = pNum;
+        hasPot = true;
+      }
+    }
+
+    rows.push({ name: team, flag, pot });
+  }
+
+  if (rows.length === 0) throw new Error('No valid team rows found.');
+  return { teams: rows, seeded: hasPot };
+}
+
+// ---- PREVIEW TABLE ----
+function buildPreviewHTML(teams, seeded) {
+  let html = '<table><thead><tr><th>#</th><th>Team</th><th>Flag</th>';
+  if (seeded) html += '<th>Pot</th>';
+  html += '</tr></thead><tbody>';
+
+  teams.forEach((t,idx) => {
+    html += `<tr>
+      <td>${idx+1}</td>
+      <td>${t.name}</td>
+      <td>${t.flag || ''}</td>`;
+    if (seeded) html += `<td>${t.pot || ''}</td>`;
+    html += '</tr>';
+  });
+
+  html += '</tbody></table>';
+  return html;
+}
+
+// ---- POT DISTRIBUTION (OPEN) ----
+function distributeOpenPots(teams) {
+  const N = teams.length;
+  if (N === 0) {
+    pots = [];
+    return;
+  }
+
+  const nGroups = config.numGroups;
+  let desiredPots = Math.max(1, parseInt(cfgNumPots.value,10) || config.numPotsOpen || 1);
+  const enforce = cfgEnforceMult.checked;
+
+  // shuffle
+  for (let i=N-1; i>0; i--) {
+    const j = Math.floor(Math.random() * (i+1));
+    [teams[i], teams[j]] = [teams[j], teams[i]];
+  }
+
+  // no enforcement
+  if (!enforce || nGroups <= 0) {
+    pots = [];
+    const base = Math.floor(N / desiredPots);
+    let extra = N % desiredPots;
+    let index = 0;
+    for (let p=0; p<desiredPots; p++) {
+      const size = base + (extra > 0 ? 1 : 0);
+      extra = Math.max(0, extra-1);
+      const potTeams = teams.slice(index, index + size).map(t => ({
+        name: t.name,
+        flag: t.flag,
+        drawn: false
+      }));
+      index += size;
+      if (potTeams.length > 0) pots.push(potTeams);
+    }
+    isOpenDraw = true;
+    return;
+  }
+
+  // enforcement: first pots multiple of groups, last pot may be uneven
+  const G = nGroups;
+  const P = desiredPots;
+  const Nteams = teams.length;
+
+  let cycles = Math.floor(Nteams / (G * P));
+  if (cycles < 1) cycles = 1;
+  const fullPotSize = G * cycles;
+
+  pots = [];
+  let offset = 0;
+
+  for (let p = 0; p < P - 1; p++) {
+    if (offset + fullPotSize > Nteams) break;
+    const slice = teams.slice(offset, offset + fullPotSize)
+      .map(t => ({ name: t.name, flag: t.flag, drawn: false }));
+    pots.push(slice);
+    offset += fullPotSize;
+  }
+
+  if (offset < Nteams) {
+    const slice = teams.slice(offset)
+      .map(t => ({ name: t.name, flag: t.flag, drawn: false }));
+    pots.push(slice);
+  }
+
+  isOpenDraw = true;
+}
+
+// ---- POT DISTRIBUTION (SEEDED) ----
+function distributeSeededPots(teams) {
+  let maxPot = 0;
+  teams.forEach(t => {
+    if (t.pot && t.pot > maxPot) maxPot = t.pot;
+  });
+  if (maxPot === 0) maxPot = 1;
+  pots = [];
+  for (let p=0; p<maxPot; p++) pots.push([]);
+  teams.forEach(t => {
+    const idx = (t.pot || 1) - 1;
+    if (!pots[idx]) pots[idx] = [];
+    pots[idx].push({ name:t.name, flag:t.flag, drawn:false });
+  });
+  isOpenDraw = false;
+}
+
+// ---- APPLY IMPORTED TEAMS ----
+function applyImportedTeams(teams, seeded) {
+  tournamentName = cfgTournamentName.value.trim() || 'Tournament';
+  config.numGroups = Math.min(64, Math.max(1, parseInt(cfgNumGroups.value,10) || 4));
+  config.groupsPerBlock = Math.min(6, Math.max(2, parseInt(cfgGroupsBlock.value,10) || 4));
+  config.numPotsOpen = Math.max(1, parseInt(cfgNumPots.value,10) || 2);
+  config.dummyTeams  = Math.max(1, parseInt(cfgDummyTeams.value,10) || 16);
+  config.potsPerPage =
+  Math.min(6, Math.max(2, parseInt(cfgPotsPage.value, 10) || 4));
+
+
+  totalTeams = teams.length;
+  groupNames = generateGroupNames(config.numGroups);
+  computeGroupSizes();
+  currentGroupIndex = 0;
+  placementHistory = [];
+
+  buildLowerThird();
+
+  if (seeded) {
+    distributeSeededPots(teams);
+  } else {
+    distributeOpenPots(teams);
+  }
+
+  currentPot = 0;
+  resetBlockHits();
+  showGroupBlock(0);
+  renderSidebar();
+}
+
+// ---- PREVIEW BUTTON ----
+csvPreviewBtn.onclick = () => {
+  csvErrorDiv.textContent = '';
+  csvPreviewDiv.innerHTML = '';
+  try {
+    if (!csvInput.value.trim()) {
+      csvErrorDiv.textContent = 'No CSV provided – previewing dummy teams.';
+      const dummyCount = Math.max(1, parseInt(cfgDummyTeams.value,10) || 16);
+      const dummyTeams = [];
+      for (let i=0; i<dummyCount; i++) {
+        dummyTeams.push({ name:`Team ${i+1}`, flag:'', pot:null });
+      }
+      csvPreviewDiv.innerHTML = buildPreviewHTML(dummyTeams, false);
+      return;
+    }
+    const { teams, seeded } = parseCSV(csvInput.value);
+    csvPreviewDiv.innerHTML = buildPreviewHTML(teams, seeded);
+    csvErrorDiv.textContent = seeded
+      ? 'Detected seeded draw (Pot column present).'
+      : 'Detected fully open draw (no Pot column).';
+  } catch (e) {
+    csvErrorDiv.textContent = e.message;
+  }
+};
+
+// ---- APPLY BUTTON ----
+csvApplyBtn.onclick = () => {
+  csvErrorDiv.textContent = '';
+  try {
+    if (!csvInput.value.trim()) {
+      savedCsvText = '';
+      tournamentName = cfgTournamentName.value.trim() || 'Tournament';
+      config.numGroups = Math.min(64, Math.max(1, parseInt(cfgNumGroups.value,10) || 4));
+      config.groupsPerBlock = Math.min(6, Math.max(2, parseInt(cfgGroupsBlock.value,10) || 4));
+      config.numPotsOpen = Math.max(1, parseInt(cfgNumPots.value,10) || 2);
+      config.dummyTeams  = Math.max(1, parseInt(cfgDummyTeams.value,10) || 16);
+	config.potsPerPage =
+ 	 Math.min(6, Math.max(2, parseInt(cfgPotsPage.value, 10) || 4));
+
+
+      totalTeams = config.dummyTeams;
+      groupNames = generateGroupNames(config.numGroups);
+      computeGroupSizes();
+      currentGroupIndex = 0;
+      placementHistory = [];
+
+      buildLowerThird();
+
+      const teams = [];
+      for (let i=0; i<totalTeams; i++) {
+        teams.push({ name:`Team ${i+1}`, flag:'', pot:null });
+      }
+      distributeOpenPots(teams);
+      currentPot = 0;
+      resetBlockHits();
+      showGroupBlock(0);
+      renderSidebar();
+      importScreen.style.display = 'none';
+      return;
+    }
+
+    savedCsvText = csvInput.value.trim();
+    const { teams, seeded } = parseCSV(csvInput.value);
+    applyImportedTeams(teams, seeded);
+    importScreen.style.display = 'none';
+  } catch (e) {
+    csvErrorDiv.textContent = e.message;
+  }
+};
+
+// ---- QUICK DRAW TRIGGER ----
+bgLogo.onclick = quickDraw;
+
+// ---- INITIALISE DEFAULT DUMMY TOURNAMENT ----
+function initDefaultTournament() {
+  tournamentName = '2026 European Outdoor Molkky Championships';
+  cfgTournamentName.value = tournamentName;
+
+  config.numGroups = 4;
+  config.groupsPerBlock = 4;
+  config.numPotsOpen = 2;
+  config.dummyTeams = 16;
+  cfgNumGroups.value = '4';
+  cfgGroupsBlock.value = '4';
+  cfgNumPots.value = '2';
+  cfgDummyTeams.value = '16';
+  cfgEnforceMult.checked = true;
+
+  cfgThemePreset.value        = 'green';
+  cfgBgColor.value            = theme.bgMain;
+  cfgGroupBgColor.value       = theme.bgGroup;
+  cfgPickedColor.value        = theme.bgPicked;
+  cfgUnpickedColor.value      = theme.bgUnpicked;
+  cfgSlotTextColor.value      = theme.textSlot;
+  cfgGroupHeaderColor.value   = theme.textGroupHeader;
+  cfgSidebarTitleColor.value  = theme.textSidebarTitle;
+  cfgPrimaryLogo.value        = theme.primaryLogo;
+  cfgSecondaryLogo.value      = theme.secondaryLogo;
+  cfgSidebarDiv.checked       = theme.showSidebarDivider;
+
+  applyTheme();
+
+  totalTeams = config.dummyTeams;
+  groupNames = generateGroupNames(config.numGroups);
+  computeGroupSizes();
+  currentGroupIndex = 0;
+  placementHistory = [];
+
+  buildLowerThird();
+
+  const teams = [];
+  for (let i=0; i<totalTeams; i++) {
+    teams.push({ name:`Team ${i+1}`, flag:'', pot:null });
+  }
+  distributeOpenPots(teams);
+  currentPot = 0;
+  resetBlockHits();
+  showGroupBlock(0);
+  renderSidebar();
+}
+
+function flagToCode2(flag) {
+  if (!flag || typeof flag !== 'string') return '';
+  const chars = Array.from(flag);
+  if (chars.length !== 2) return '';
+
+  const A = 0x1F1E6;
+  const a = chars[0].codePointAt(0) - A;
+  const b = chars[1].codePointAt(0) - A;
+
+  if (a < 0 || a > 25 || b < 0 || b > 25) return '';
+  return String.fromCharCode(65 + a) + String.fromCharCode(65 + b);
+}
+
+function buildCsvFromPots(potsArr) {
+  if (!Array.isArray(potsArr)) return '';
+
+  const lines = [];
+
+  for (let p = 0; p < potsArr.length; p++) {
+    for (const t of (potsArr[p] || [])) {
+      const name = (t.name || '').replace(/,/g, '');
+      const code = t.code || flagToCode2(t.flag || '');
+      lines.push(`${name},${code},${p + 1}`);
+    }
+  }
+
+  return lines.join('\n');
+}
+
+function exportConfigToFile() {
+  const csvForExport = savedCsvText && savedCsvText.trim()
+    ? savedCsvText.trim()
+    : buildCsvFromPots(pots);
+
+  const payload = {
+    version: 2,
+    tournamentName,
+    config: {
+      numGroups: config.numGroups,
+      groupsPerBlock: config.groupsPerBlock,
+      numPotsOpen: config.numPotsOpen,
+      dummyTeams: config.dummyTeams,
+      potsPerPage: config.potsPerPage
+    },
+    theme,
+    numberTeamsInPot,
+    csvText: csvForExport
+  };
+
+  const json = JSON.stringify(payload, null, 2);
+  const blob = new Blob([json], { type: 'text/plain' });
+
+  const filename =
+    (tournamentName || 'draw')
+      .replace(/[^a-z0-9]+/gi, '_')
+      .toLowerCase() + '_config.txt';
+
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+}
+
+function importConfigFromText(text) {
+  let data;
+
+  try {
+    data = JSON.parse(text);
+  } catch {
+    alert('Invalid config file.');
+    return;
+  }
+
+  if (!data || (data.version !== 1 && data.version !== 2)) {
+    alert('Unsupported config file.');
+    return;
+  }
+
+  tournamentName = data.tournamentName || 'Tournament';
+  Object.assign(config, data.config || {});
+  Object.assign(theme, data.theme || {});
+  numberTeamsInPot = !!data.numberTeamsInPot;
+
+  // Version 2 stores the Teams box directly.
+  // Version 1 fallback rebuilds it from saved pots.
+  savedCsvText = data.csvText && String(data.csvText).trim()
+    ? String(data.csvText).trim()
+    : buildCsvFromPots(data.pots || []);
+
+  csvInput.value = savedCsvText;
+
+  syncConfigUIFromState();
+  applyTheme();
+
+  const parsed = parseCSV(savedCsvText);
+  applyImportedTeams(parsed.teams, parsed.seeded);
+
+  currentPot = 0;
+  currentGroupIndex = 0;
+  placementHistory = [];
+  groupCounts = new Array(config.numGroups).fill(0);
+
+  buildLowerThird();
+  resetBlockHits();
+  showGroupBlock(0);
+  renderSidebar();
+}
+
+document.getElementById('menu-export-config').onclick = () => {
+  menuDropdown.style.display = 'none';
+  exportConfigToFile();
+};
+
+const fileInput = document.getElementById('config-file-input');
+
+document.getElementById('menu-import-config').onclick = () => {
+  menuDropdown.style.display = 'none';
+  fileInput.value = '';
+  fileInput.click();
+};
+
+fileInput.addEventListener('change', () => {
+  const file = fileInput.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = e => importConfigFromText(e.target.result);
+  reader.readAsText(file);
+});
+
+function syncConfigUIFromState() {
+  // Tournament name
+  cfgTournamentName.value = tournamentName || '';
+
+  // Core config
+  cfgNumGroups.value     = String(config.numGroups ?? 4);
+  cfgGroupsBlock.value   = String(config.groupsPerBlock ?? 4);
+  cfgNumPots.value       = String(config.numPotsOpen ?? 2);
+  cfgDummyTeams.value    = String(config.dummyTeams ?? 16);
+  cfgPotsPage.value = String(config.potsPerPage ?? 4);
+  cfgEnforceMult.checked = !!cfgEnforceMult.checked; // leave user choice as-is OR store it (see note below)
+
+  // Numbering toggle
+  const toggleNumbering = document.getElementById('toggleNumbering');
+  if (toggleNumbering) toggleNumbering.checked = !!numberTeamsInPot;
+
+  // Theme preset (optional; if you want it to reflect the last chosen preset, store it)
+  // cfgThemePreset.value = 'green';
+
+  // Theme colours
+  cfgBgColor.value            = theme.bgMain;
+  cfgGroupBgColor.value       = theme.bgGroup;
+  cfgPickedColor.value        = theme.bgPicked;
+  cfgUnpickedColor.value      = theme.bgUnpicked;
+  cfgSlotTextColor.value      = theme.textSlot;
+  cfgGroupHeaderColor.value   = theme.textGroupHeader;
+  cfgSidebarTitleColor.value  = theme.textSidebarTitle;
+
+  // Logos
+  cfgPrimaryLogo.value        = theme.primaryLogo || '';
+  cfgSecondaryLogo.value      = theme.secondaryLogo || '';
+  cfgSidebarDiv.checked       = !!theme.showSidebarDivider;
+  csvInput.value = savedCsvText || '';
+}
+
+let finalViewMode = 'groups'; // 'groups' | 'pots'
+
+document.addEventListener('keydown', e => {
+  if (importScreen.style.display === 'flex') return;
+
+  const tag = (e.target.tagName || '').toLowerCase();
+
+  if (
+    tag === 'input' ||
+    tag === 'textarea' ||
+    tag === 'select' ||
+    e.target.isContentEditable
+  ) {
+    return;
+  }
+
+  if (e.key !== 'f' && e.key !== 'F' && e.key !== 'o' && e.key !== 'O') return;
+
+  const requestedMode = (e.key === 'o' || e.key === 'O') ? 'pots' : 'groups';
+  const isOpen = finalScreen.style.display === 'flex';
+
+  if (isOpen && finalViewMode === requestedMode) {
+    closeFinalScreen();
+    return;
+  }
+
+  finalViewMode = requestedMode;
+  finalPageIndex = 0;
+  finalPotPageIndex = 0;
+
+  if (!isOpen) {
+    openFinalScreen();
+  } else {
+    updateFinalTitle();
+    if (finalViewMode === 'groups') {
+      renderFinalPage();
+    } else {
+      renderPotOverviewPage();
+    }
+  }
+});
+
+initDefaultTournament();
+</script>
+
+
+</body>
+</html>
