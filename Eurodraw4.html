@@ -1175,7 +1175,7 @@ function renderSidebar() {
  	   ? `<span class="pot-number">${i + 1}</span>`
  	   : '';
 
-	  const flagHtml = t.code ? `<img class="flag-img" src="https://flagcdn.com/w40/${t.code/toLowerCase()}.png" alt="${t.code}">` : '';
+	  const flagHtml = t.code ? `<img class="flag-img" src="https://flagcdn.com/w40/${t.code.toLowerCase()}.png" alt="${t.code}">` : '';
 
  	 div.innerHTML = `
  	   ${numberHtml}
@@ -1790,6 +1790,7 @@ function distributeOpenPots(teams) {
       const potTeams = teams.slice(index, index + size).map(t => ({
         name: t.name,
         flag: t.flag,
+		  code: t.code || '',
         drawn: false
       }));
       index += size;
@@ -1814,7 +1815,7 @@ function distributeOpenPots(teams) {
   for (let p = 0; p < P - 1; p++) {
     if (offset + fullPotSize > Nteams) break;
     const slice = teams.slice(offset, offset + fullPotSize)
-      .map(t => ({ name: t.name, flag: t.flag, drawn: false }));
+      .map(t => ({ name: t.name, flag: t.flag, code: t.code || '', drawn: false }));
     pots.push(slice);
     offset += fullPotSize;
   }
