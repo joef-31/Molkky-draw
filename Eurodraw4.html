@@ -588,6 +588,15 @@ body {
 
   flex-shrink: 0;
 }
+
+.flag-img {
+	width: 28px;
+	height: 19px;
+	object-fit: cover;
+	margin-right: 6px;
+	border-radius: 2px;
+	flex-shrink: 0;
+}
 </style>
 </head>
 <body>
@@ -1166,7 +1175,7 @@ function renderSidebar() {
  	   ? `<span class="pot-number">${i + 1}</span>`
  	   : '';
 
-	  const flagHtml = t.flag ? `<div class="flag-box">${t.flag}</div>` : '';
+	  const flagHtml = t.code ? `<img class="flag-img" src="https://flagcdn.com/w40/${t.code/toLowerCase()}.png" alt="${t.code}">` : '';
 
  	 div.innerHTML = `
  	   ${numberHtml}
@@ -1725,7 +1734,7 @@ function parseCSV(text) {
       }
     }
 
-    rows.push({ name: team, flag, pot });
+    rows.push({ name: team, flag, code: code.length === 3 ? iso3to2[code.toUpperCase()] : code.toUpperCase(), pot });
   }
 
   if (rows.length === 0) throw new Error('No valid team rows found.');
@@ -1812,7 +1821,7 @@ function distributeOpenPots(teams) {
 
   if (offset < Nteams) {
     const slice = teams.slice(offset)
-      .map(t => ({ name: t.name, flag: t.flag, drawn: false }));
+      .map(t => ({ name: t.name, flag: t.flag, code: t.code || '', drawn: false }));
     pots.push(slice);
   }
 
@@ -1831,7 +1840,7 @@ function distributeSeededPots(teams) {
   teams.forEach(t => {
     const idx = (t.pot || 1) - 1;
     if (!pots[idx]) pots[idx] = [];
-    pots[idx].push({ name:t.name, flag:t.flag, drawn:false });
+    pots[idx].push({ name:t.name, flag:t.flag, code:t.code || '', drawn:false });
   });
   isOpenDraw = false;
 }
